@@ -80,6 +80,11 @@ uv run tts_to_blackhole.py --verify "你好，这是 BlackHole 安装验证。"
   自动增益等处理后复测。
 - 出现采样率变化或声音变速：先打开会议软件并选好设备，等待格式稳定后再启动
   脚本；若脚本因采样率变化停止，稳定后重新运行。
+- TTS 连接返回 `403 Invalid response status`：先运行 `uv sync`，确认使用
+  `edge-tts>=7.3.1`；旧版本缺少新版服务握手支持。更新项目依赖锁定时可运行
+  `uv lock --upgrade-package edge-tts && uv sync`。退出并重新启动正在运行的脚本，
+  让新版本生效。如果仍报错，再检查系统日期时间、网络或代理；该错误发生在
+  在线合成阶段，与 BlackHole 和 FFmpeg 无关。
 
 ## 使用
 
