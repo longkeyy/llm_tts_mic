@@ -1,0 +1,16 @@
+[project]
+name = "edge-tts-blackhole-poc"
+version = "0.1.0"
+description = "Send Edge TTS speech to a BlackHole virtual microphone on macOS"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "edge-tts>=7.0,<8",
+    "numpy>=2.0,<3",
+    "prompt-toolkit>=3.0,<4",
+    "pynput>=1.8,<2",
+    "sounddevice>=0.5,<1",
+]
+
+[tool.uv]
+package = false

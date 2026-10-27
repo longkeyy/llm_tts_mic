@@ -1,0 +1,5 @@
+edge-tts>=7.0,<8
+numpy>=2.0,<3
+prompt-toolkit>=3.0,<4
+pynput>=1.8,<2
+sounddevice>=0.5,<1
