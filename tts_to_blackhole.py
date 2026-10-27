@@ -914,8 +914,9 @@ def run_interactive(
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="将 edge-tts 语音推送到 BlackHole 虚拟麦克风")
+    parser = argparse.ArgumentParser(description="将 TTS 语音或音频文件推送到 BlackHole 虚拟麦克风")
     parser.add_argument("text", nargs="?", help="需要朗读的文本")
+    parser.add_argument("--file", type=Path, help="播放本地音频文件（如 MP3、WAV、M4A、FLAC）")
     parser.add_argument("--voice", default=DEFAULT_VOICE, help="edge-tts 声音名称")
     parser.add_argument("--rate", default="+0%", help="语速，例如 +10%% 或 -10%%")
     parser.add_argument("--volume", default="+0%", help="音量，例如 +10%% 或 -10%%")
@@ -940,7 +941,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument("--stream", action="store_true", help="边合成边推送，不保存完整 MP3")
     parser.add_argument("--verify", action="store_true", help="同步回录并检查 BlackHole 信号")
-    return parser.parse_args(argv)
+    args = parser.parse_args(argv)
+    if args.file is not None:
+        if args.text is not None or args.interactive or args.stream:
+            parser.error("--file 不能与文本、--interactive 或 --stream 同时使用")
+        args.file = args.file.expanduser().resolve()
+        if not args.file.is_file():
+            parser.error(f"音频文件不存在或不是普通文件：{args.file}")
+    return args
 
 
 def verify_device_sample_rate(device_index: int, expected: int) -> None:
@@ -959,10 +967,15 @@ def main() -> None:
     sample_rate = wait_for_stable_sample_rate(device_index)
     if sample_rate <= 0:
         raise RuntimeError(f"设备返回了无效采样率：{sample_rate}")
-    print(f"合成声音：{args.voice}")
+    if args.file is None:
+        print(f"合成声音：{args.voice}")
     print(f"输出设备：{device_name} (#{device_index})")
     print(f"设备采样率：{sample_rate} Hz")
-    print(f"音频转换：Edge TTS {EDGE_TTS_SAMPLE_RATE} Hz -> {sample_rate} Hz")
+    if args.file is not None:
+        print(f"音频文件：{args.file}")
+        print(f"音频转换：文件音轨 -> {sample_rate} Hz")
+    else:
+        print(f"音频转换：Edge TTS {EDGE_TTS_SAMPLE_RATE} Hz -> {sample_rate} Hz")
     print("输出格式：PCM float32 / 双声道")
     if args.interactive:
         run_interactive(
@@ -991,10 +1004,13 @@ def main() -> None:
         verify_device_sample_rate(device_index, sample_rate)
         print("播放完成。")
         return
-    with tempfile.TemporaryDirectory(prefix="edge-tts-blackhole-") as temp_dir:
-        audio_file = Path(temp_dir) / "speech.mp3"
-        asyncio.run(synthesize(text, args.voice, args.rate, args.volume, audio_file))
-        dbfs = play(audio_file, device_index, str(device_name), sample_rate, args.verify)
+    if args.file is not None:
+        dbfs = play(args.file, device_index, str(device_name), sample_rate, args.verify)
+    else:
+        with tempfile.TemporaryDirectory(prefix="edge-tts-blackhole-") as temp_dir:
+            audio_file = Path(temp_dir) / "speech.mp3"
+            asyncio.run(synthesize(text, args.voice, args.rate, args.volume, audio_file))
+            dbfs = play(audio_file, device_index, str(device_name), sample_rate, args.verify)
     verify_device_sample_rate(device_index, sample_rate)
     print("播放完成。")
     if args.verify:

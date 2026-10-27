@@ -1,4 +1,8 @@
 import asyncio
+import contextlib
+import io
+from pathlib import Path
+import tempfile
 import unittest
 from unittest.mock import patch
 
@@ -9,6 +13,7 @@ from tts_to_blackhole import (
     TTSStreamWorker,
     apply_microphone_gate,
     comparable_tts_text,
+    main,
     parse_args,
     split_tts_text,
 )
@@ -95,6 +100,41 @@ class TextChunkTest(unittest.TestCase):
 
 
 class ParseArgsTest(unittest.TestCase):
+    def test_file_mode_rejects_conflicting_sources(self) -> None:
+        for extra in (["hello"], ["--interactive"], ["--stream"]):
+            with self.subTest(extra=extra), contextlib.redirect_stderr(io.StringIO()):
+                with self.assertRaises(SystemExit) as error:
+                    parse_args(["--file", "audio.wav", *extra])
+                self.assertEqual(error.exception.code, 2)
+
+    def test_file_mode_rejects_missing_file_and_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as folder:
+            for path in (folder, str(Path(folder) / "missing.wav")):
+                with self.subTest(path=path), contextlib.redirect_stderr(io.StringIO()):
+                    with self.assertRaises(SystemExit):
+                        parse_args(["--file", path])
+
+    def test_file_mode_plays_selected_file_without_tts(self) -> None:
+        with tempfile.TemporaryDirectory() as folder:
+            audio = Path(folder) / "测试 audio.wav"
+            audio.write_bytes(b"fixture")
+            args = parse_args(["--file", str(audio), "--device", "Test Output", "--verify"])
+            with (
+                patch("tts_to_blackhole.parse_args", return_value=args),
+                patch("tts_to_blackhole.find_device", return_value=3) as find,
+                patch("tts_to_blackhole.sd.query_devices", return_value={"name": "Test Output"}),
+                patch("tts_to_blackhole.wait_for_stable_sample_rate", return_value=48000),
+                patch("tts_to_blackhole.verify_device_sample_rate") as verify_rate,
+                patch("tts_to_blackhole.synthesize") as synthesize,
+                patch("tts_to_blackhole.play", return_value=-20.0) as play,
+                contextlib.redirect_stdout(io.StringIO()),
+            ):
+                main()
+            find.assert_called_once_with("Test Output")
+            play.assert_called_once_with(audio.resolve(), 3, "Test Output", 48000, True)
+            verify_rate.assert_called_once_with(3, 48000)
+            synthesize.assert_not_called()
+
     def test_interactive_defaults_to_mix_for_backward_compatibility(self) -> None:
         self.assertEqual(parse_args(["--interactive"]).interactive, "mix")
 
