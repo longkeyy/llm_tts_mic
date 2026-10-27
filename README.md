@@ -83,6 +83,29 @@ uv run tts_to_blackhole.py --verify "你好，这是 BlackHole 安装验证。"
 
 ## 使用
 
+### 播放本地音频文件到麦克风
+
+将会议软件的麦克风设为 `BlackHole 2ch`，然后执行：
+
+```bash
+uv run tts_to_blackhole.py --file "/路径/录音.mp3"
+```
+
+支持 FFmpeg 可解码的音频格式，如 MP3、WAV、M4A、FLAC。文件模式无需调用
+Edge TTS，按正常速度播放一次，自动转换到输出设备采样率和双声道；播放结束退出，
+可按 `Ctrl+C` 中止。路径包含空格时请加引号。
+
+可指定输出设备，或在退出会议软件后单独验证 BlackHole 回录：
+
+```bash
+uv run tts_to_blackhole.py --file "./录音.wav" --device "BlackHole 2ch"
+uv run tts_to_blackhole.py --file "./录音.wav" --verify
+```
+
+`--file` 不可与朗读文本、`--interactive`、`--stream` 混用；此模式不混入实体
+麦克风。`--voice`、`--rate`、`--volume` 为 TTS 参数，不改变文件播放。
+不支持的格式或损坏文件会由 FFmpeg 报错；`--verify` 的会议使用限制见下文。
+
 ### 交互模式
 
 仅接收控制台文字，不读取物理麦克风：
